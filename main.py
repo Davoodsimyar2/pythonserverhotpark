@@ -55,6 +55,7 @@ def poll():
     - موبایل: ?code=1234 → دریافت آخرین دیتا فقط برای یک کد مشخص
     """
     last = float(request.args.get("last", 0))
+    get_time = time.time()  # زمان GET زدن
 
     # حالت موبایل: فقط یک کد مشخص
     code = request.args.get("code")
@@ -62,24 +63,25 @@ def poll():
         try:
             code = int(code)
         except:
-            return jsonify({"error": "invalid code"}), 400
+            return jsonify({"error": "invalid code", "get_timestamp": get_time}), 400
         device_id = get_device_id(code)
         if device_id in device_data and code in device_data[device_id]:
             return jsonify({
                 "data": device_data[device_id][code],
-                "timestamp": device_timestamp[device_id][code]
+                "timestamp": device_timestamp[device_id][code],  # زمان ذخیره دیتا
+                "get_timestamp": get_time                        # زمان GET زدن
             })
         else:
-            return jsonify({"status": "no data for this code"}), 404
+            return jsonify({"status": "no data for this code", "get_timestamp": get_time}), 404
 
     # حالت ESP: دریافت همه کدهای رنج
     device_id = request.args.get("device_id")
     if device_id is None:
-        return jsonify({"error": "device_id missing"}), 400
+        return jsonify({"error": "device_id missing", "get_timestamp": get_time}), 400
     try:
         device_id = int(device_id)
     except:
-        return jsonify({"error": "invalid device_id"}), 400
+        return jsonify({"error": "invalid device_id", "get_timestamp": get_time}), 400
 
     timeout = 30
     start = time.time()
@@ -93,12 +95,20 @@ def poll():
         if updated_codes:
             # آخرین timestamp از بین همه کدهای جدید
             latest_ts = max(device_timestamp[device_id][c] for c in updated_codes)
-            return jsonify({"data": updated_codes, "timestamp": latest_ts})
+            return jsonify({
+                "data": updated_codes,
+                "timestamp": latest_ts,      # زمان ذخیره دیتا
+                "get_timestamp": time.time() # زمان GET زدن
+            })
 
         time.sleep(0.5)
 
     # بدون داده جدید
-    return jsonify({"status": "no new data", "timestamp": last})
+    return jsonify({
+        "status": "no new data",
+        "timestamp": last,
+        "get_timestamp": time.time()  # زمان GET زدن وقتی داده جدید نبود
+    })
 
 
 @app.route("/", methods=["GET"])
@@ -106,7 +116,8 @@ def home():
     """نمایش همه ESPها برای دیباگ"""
     return jsonify({
         "devices": device_data,
-        "timestamps": device_timestamp
+        "timestamps": device_timestamp,
+        "get_timestamp": time.time()  # زمان GET زدن برای دیباگ
     })
 
 
